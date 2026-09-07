@@ -24,7 +24,12 @@ doesn't, and the diagnosis so far. Read that before investing time.
   cross-compiler, so **mingw-w64 is not needed** (saves a ~1.2 GB install).
 * **Your own copy of the vendor installers.** Nothing vendor-supplied is
   redistributed here:
-  * `HQ-PDS16(980).exe` — the app (from Hengqiang)
+  * `HQ-PDS16(980).exe` — the app itself, listed as "Hengqiang 980 Plate
+    Making Software" (~214 MB) at the vendor's download centre:
+    <https://www.hqcnc.com/download.html> (Zhejiang Hengqiang Technology Co.,
+    Ltd.). An English manual is offered on the same page. Note the download
+    buttons there are script-driven rather than plain links, so you may need to
+    go through the page itself or their support line.
   * `AccessRuntime.exe` — Microsoft Access 2007 Runtime
   Put both in the repo root, or point `HQ_APP_INSTALLER` / `HQ_ACCESS_INSTALLER`
   at them.

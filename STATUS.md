@@ -262,6 +262,11 @@ Wine's file there is a stub PE forwarding to its builtin `.so`).
 
 ## Reference
 
+- Vendor: Zhejiang Hengqiang Technology Co., Ltd. — download centre at
+  <https://www.hqcnc.com/download.html>, where this is listed as "Hengqiang 980
+  Plate Making Software" (~214 MB, matching `HQ-PDS16(980).exe` at 224,599,559
+  bytes). An English manual is published alongside it, which is likely the best
+  reference for what the app's dialogs and machine parameters actually mean.
 - App: `C:\Program Files (x86)\恒强\横机制板系统（16把纱嘴）\HxPDS.exe`
 - Databases: `language.accdb` (UI strings), `HengJi.accdb` (37 MB) — encrypted,
   format `Standard ACE DB`. The password is the vendor's, hardcoded in the app;
