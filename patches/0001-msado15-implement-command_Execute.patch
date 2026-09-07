@@ -1,0 +1,136 @@
+--- a/dlls/msado15/command.c
++++ b/dlls/msado15/command.c
+@@ -404,10 +404,49 @@
+     return S_OK;
+ }
+ 
++/* The VARIANT form of ActiveConnection, which is what IDispatch-based callers
++ * (scripts, and anything doing cmd.ActiveConnection = conn) end up in. Accepts
++ * either a live connection object or a connection string, mirroring
++ * recordset_put_ActiveConnection, then hands off to the putref path. */
+ static HRESULT WINAPI command_put_ActiveConnection( _Command *iface, VARIANT connection )
+ {
+-    FIXME( "%p, %s\n", iface, debugstr_variant(&connection) );
+-    return E_NOTIMPL;
++    _Connection *conn = NULL;
++    HRESULT hr;
++
++    TRACE( "%p, %s\n", iface, debugstr_variant(&connection) );
++
++    switch (V_VT( &connection ))
++    {
++    case VT_EMPTY:
++    case VT_NULL:
++        break;
++
++    case VT_BSTR:
++        if (FAILED(hr = Connection_create( (void **)&conn ))) return hr;
++        hr = _Connection_Open( conn, V_BSTR( &connection ), NULL, NULL, adConnectUnspecified );
++        if (FAILED(hr))
++        {
++            _Connection_Release( conn );
++            return hr;
++        }
++        break;
++
++    case VT_UNKNOWN:
++    case VT_DISPATCH:
++        if (!V_UNKNOWN( &connection )) return MAKE_ADO_HRESULT( adErrInvalidConnection );
++        hr = IUnknown_QueryInterface( V_UNKNOWN( &connection ), &IID__Connection, (void **)&conn );
++        if (FAILED(hr)) return hr;
++        break;
++
++    default:
++        FIXME( "unsupported connection %s\n", debugstr_variant(&connection) );
++        return E_NOTIMPL;
++    }
++
++    hr = command_putref_ActiveConnection( iface, conn );
++    /* putref took its own reference (or cleared the slot for a NULL conn). */
++    if (conn) _Connection_Release( conn );
++    return hr;
+ }
+ 
+ static HRESULT WINAPI command_get_CommandText( _Command *iface, BSTR *text )
+@@ -462,8 +501,79 @@
+ static HRESULT WINAPI command_Execute( _Command *iface, VARIANT *affected, VARIANT *parameters,
+                                        LONG options, _Recordset **recordset )
+ {
+-    FIXME( "%p, %p, %p, %ld, %p\n", iface, affected, parameters, options, recordset );
+-    return E_NOTIMPL;
++    struct command *command = impl_from_Command( iface );
++    CursorLocationEnum location = adUseServer;
++    CursorTypeEnum cursor_type;
++    VARIANT source, active;
++    IDispatch *dispatch;
++    _Recordset *rs;
++    HRESULT hr;
++
++    TRACE( "%p, %p, %p, %ld, %p\n", iface, affected, parameters, options, recordset );
++
++    if (!recordset) return E_POINTER;
++    *recordset = NULL;
++
++    if (!command->connection) return MAKE_ADO_HRESULT( adErrInvalidConnection );
++    if (!command->text) return MAKE_ADO_HRESULT( adErrInvalidArgument );
++
++    if (parameters && V_VT( parameters ) != VT_EMPTY && V_VT( parameters ) != VT_ERROR)
++        FIXME( "ignoring parameters %s\n", debugstr_variant(parameters) );
++    if (!list_empty( &command->parameters ))
++        FIXME( "ignoring bound Parameters collection\n" );
++
++    if (FAILED(hr = Recordset_create( (void **)&rs ))) return hr;
++
++    _Connection_get_CursorLocation( command->connection, &location );
++    _Recordset_put_CursorLocation( rs, location );
++
++    hr = _Connection_QueryInterface( command->connection, &IID_IDispatch, (void **)&dispatch );
++    if (FAILED(hr))
++    {
++        _Recordset_Release( rs );
++        return hr;
++    }
++
++    /* Recordset_Open() resolves the source itself: it first tries to open it as
++     * a table name and falls back to ICommandText, so plain SQL text works. */
++    V_VT( &source ) = VT_BSTR;
++    V_BSTR( &source ) = command->text;
++    V_VT( &active ) = VT_DISPATCH;
++    V_DISPATCH( &active ) = dispatch;
++
++    /* ADO hands back a forward-only, read-only recordset from Command.Execute
++     * unless asked otherwise; that also asks the provider for the fewest
++     * rowset capabilities, so it is the most widely supported combination.
++     *
++     * adUseClient is the exception. There, real ADO fetches the rows through
++     * the client cursor engine, which is always static and scrollable, and
++     * callers rely on that -- MoveLast on the result is legal on Windows. We
++     * have no client cursor over a live rowset, so ask the provider for a
++     * static one instead: that is what gets DBPROP_IRowsetLocate requested,
++     * which is in turn what makes bookmarks (and so MoveLast) work. */
++    cursor_type = (location == adUseClient) ? adOpenStatic : adOpenForwardOnly;
++
++    hr = _Recordset_Open( rs, source, active, cursor_type, adLockReadOnly,
++                          options ? options : command->type );
++    VariantClear( &active );
++    if (FAILED(hr))
++    {
++        _Recordset_Release( rs );
++        return hr;
++    }
++
++    if (affected)
++    {
++        ADO_LONGPTR count;
++        if (SUCCEEDED(_Recordset_get_RecordCount( rs, &count )))
++        {
++            V_VT( affected ) = VT_I4;
++            V_I4( affected ) = count;
++        }
++    }
++
++    *recordset = rs;
++    return S_OK;
+ }
+ 
+ static HRESULT WINAPI parameter_QueryInterface(_Parameter *iface, REFIID riid, void **obj)

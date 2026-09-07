@@ -1,0 +1,16 @@
+# Huge vendor installers — keep out of git
+*.exe
+*.rar
+
+# Downloaded third-party redistributables + extraction scratch
+downloads/
+
+# Wine source tree (fetched by scripts/20-fetch-wine-src.sh)
+wine-src/
+
+# Run logs and screenshots
+logs/
+*.png
+
+# Local agent/editor config — not shared
+.claude/

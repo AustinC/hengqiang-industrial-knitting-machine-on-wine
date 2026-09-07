@@ -1,0 +1,47 @@
+--- a/dlls/msado15/recordset.c
++++ b/dlls/msado15/recordset.c
+@@ -3274,16 +3274,40 @@
+     return S_OK;
+ }
+ 
++/* Recordset.Collect is the property behind the recordset's default member, so
++ * rs("Name") in script and rs->GetCollect("Name") in C++ both land here. It is
++ * just shorthand for Fields.Item(index).Value, which is how it is implemented. */
+ static HRESULT WINAPI recordset_get_Collect( _Recordset *iface, VARIANT index, VARIANT *var )
+ {
+-    FIXME( "%p, %s, %p\n", iface, debugstr_variant(&index), var );
+-    return E_NOTIMPL;
++    struct recordset *recordset = impl_from_Recordset( iface );
++    Field *field;
++    HRESULT hr;
++
++    TRACE( "%p, %s, %p\n", iface, debugstr_variant(&index), var );
++
++    if (!var) return E_POINTER;
++    if (recordset->state == adStateClosed) return MAKE_ADO_HRESULT( adErrObjectClosed );
++
++    if (FAILED(hr = Fields_get_Item( &recordset->fields.Fields_iface, index, &field ))) return hr;
++    hr = Field_get_Value( field, var );
++    Field_Release( field );
++    return hr;
+ }
+ 
+ static HRESULT WINAPI recordset_put_Collect( _Recordset *iface, VARIANT index, VARIANT var )
+ {
+-    FIXME( "%p, %s, %s\n", iface, debugstr_variant(&index), debugstr_variant(&var) );
+-    return E_NOTIMPL;
++    struct recordset *recordset = impl_from_Recordset( iface );
++    Field *field;
++    HRESULT hr;
++
++    TRACE( "%p, %s, %s\n", iface, debugstr_variant(&index), debugstr_variant(&var) );
++
++    if (recordset->state == adStateClosed) return MAKE_ADO_HRESULT( adErrObjectClosed );
++
++    if (FAILED(hr = Fields_get_Item( &recordset->fields.Fields_iface, index, &field ))) return hr;
++    hr = Field_put_Value( field, var );
++    Field_Release( field );
++    return hr;
+ }
+ 
+ static HRESULT WINAPI recordset_get_MarshalOptions( _Recordset *iface, MarshalOptionsEnum *options )
