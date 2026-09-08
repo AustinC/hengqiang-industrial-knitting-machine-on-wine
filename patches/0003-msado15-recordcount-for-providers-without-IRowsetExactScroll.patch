@@ -1,0 +1,104 @@
+--- a/dlls/msado15/recordset.c
++++ b/dlls/msado15/recordset.c
+@@ -134,6 +134,7 @@
+     VARIANT_BOOL       is_bof;
+     VARIANT_BOOL       is_eof;
+     ADO_LONGPTR        max_records;
++    ADO_LONGPTR        row_count;
+ 
+     struct rb_tree     hacc_cache;
+ 
+@@ -1706,6 +1707,7 @@
+ 
+     cache_release( recordset );
+     recordset->is_bof = recordset->is_eof = VARIANT_FALSE;
++    recordset->row_count = -1;
+ 
+     rb_destroy( &recordset->hacc_cache, free_hacc, recordset );
+ 
+@@ -2232,7 +2234,10 @@
+             recordset->rowset_es = NO_INTERFACE;
+     }
+     if (recordset->rowset_es == NO_INTERFACE)
++    {
++        *count = recordset->row_count;
+         return S_OK;
++    }
+ 
+     hr = IRowsetExactScroll_GetExactPosition( recordset->rowset_es, 0, 0, 0, 0, &rows );
+     if (SUCCEEDED(hr))
+@@ -4189,6 +4218,57 @@
+     }
+ }
+ 
++/* Walk the rowset once and count its rows, leaving the cursor back at the
++ * start. Only worth doing for an adUseClient recordset: there, real ADO hands
++ * the rows to the client cursor engine, which fetches all of them up front, so
++ * the extra pass costs what Windows already pays -- and it is the only way to
++ * answer RecordCount for a provider that does not implement IRowsetExactScroll.
++ * A server-side cursor is left alone; fetching it eagerly would be a real
++ * regression.
++ *
++ * Called before the recordset has been positioned, so RestartPosition puts the
++ * cursor back exactly where the caller expects to find it. */
++static void count_rows( struct recordset *recordset )
++{
++    DBCOUNTITEM obtained, total = 0;
++    HROW buf[64], *rows = buf;
++    IRowsetExactScroll *es;
++    HRESULT hr;
++    VARIANT v;
++
++    recordset->row_count = -1;
++
++    if (recordset->cursor_location != adUseClient) return;
++    /* An exact count is available for free; no need to walk anything. */
++    if (SUCCEEDED(IRowset_QueryInterface( recordset->row_set, &IID_IRowsetExactScroll, (void **)&es )))
++    {
++        IRowsetExactScroll_Release( es );
++        return;
++    }
++    /* Without this the walk is one-way and there is no getting back. */
++    if (!recordset_get_prop( recordset, &DBPROPSET_ROWSET, DBPROP_CANSCROLLBACKWARDS, &v ) || !V_BOOL( &v ))
++        return;
++
++    for (;;)
++    {
++        rows = buf;
++        hr = IRowset_GetNextRows( recordset->row_set, DB_NULL_HCHAPTER, 0, ARRAY_SIZE(buf), &obtained, &rows );
++        if (FAILED(hr)) break;
++        total += obtained;
++        if (obtained) IRowset_ReleaseRows( recordset->row_set, obtained, rows, NULL, NULL, NULL );
++        if (obtained < ARRAY_SIZE(buf)) break;
++    }
++
++    if (FAILED(hr) || FAILED(IRowset_RestartPosition( recordset->row_set, DB_NULL_HCHAPTER )))
++    {
++        WARN( "could not count rows, hr %#lx\n", hr );
++        return;
++    }
++
++    TRACE( "counted %Iu rows\n", total );
++    recordset->row_count = total;
++}
++
+ static HRESULT WINAPI rsconstruction_put_Rowset(ADORecordsetConstruction *iface, IUnknown *unk)
+ {
+     struct recordset *recordset = impl_from_ADORecordsetConstruction( iface );
+@@ -4253,6 +4333,8 @@
+     if (SUCCEEDED(hr)) init_bookmark( recordset );
+ 
+     IRowset_QueryInterface( rowset, &IID_IRowsetFind, (void**)&recordset->rowset_find );
++
++    count_rows( recordset );
+     return S_OK;
+ }
+ 
+@@ -4330,6 +4412,7 @@
+     recordset->cache.size = 1;
+     recordset->cache.rows = malloc( sizeof(*recordset->cache.rows) );
+     recordset->max_records = 0;
++    recordset->row_count = -1;
+     Fields_create( recordset );
+     rb_init( &recordset->hacc_cache, hacc_cmp);
+ 

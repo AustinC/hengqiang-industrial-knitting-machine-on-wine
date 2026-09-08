@@ -1,6 +1,6 @@
 --- a/dlls/msado15/recordset.c
 +++ b/dlls/msado15/recordset.c
-@@ -3274,16 +3274,40 @@
+@@ -3274,16 +3279,40 @@
      return S_OK;
  }
  
