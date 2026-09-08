@@ -31,3 +31,18 @@ ACCESS_INSTALLER="${HQ_ACCESS_INSTALLER:-$SRC/AccessRuntime.exe}"
 
 LOGDIR="${HQ_LOGDIR:-$SRC/logs}"
 mkdir -p "$LOGDIR"
+
+# Optional wine virtual desktop, e.g. HQ_VDESKTOP=1920x1200. Worth switching on
+# for the headless display from 30-xvfb.sh: there is no window manager there, so
+# without it nothing stacks or takes focus, and the app's modal dialogs end up
+# unreachable. Wine's own desktop window does that job itself.
+VDESKTOP="${HQ_VDESKTOP:-}"
+
+# Launch a windows binary, honouring HQ_VDESKTOP. Use in place of bare `wine`.
+hq_wine() {
+    if [ -n "$VDESKTOP" ]; then
+        wine explorer /desktop=hqpds,"$VDESKTOP" "$@"
+    else
+        wine "$@"
+    fi
+}
