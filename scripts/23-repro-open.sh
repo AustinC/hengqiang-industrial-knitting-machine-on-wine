@@ -19,7 +19,7 @@ LOG="${SRC}/logs/${2:-open-doc}.log"
 "$SRC/scripts/30-xvfb.sh" start >/dev/null || exit 1
 
 # A previous instance holds a lock on HengJi.accdb and would change what we see.
-pkill -f 'HxPDS[.]exe' 2>/dev/null && sleep 2
+"$SRC/scripts/apppid.sh" kill >/dev/null
 
 "$SRC/scripts/22-open-doc.sh" "$1" "${2:-open-doc}" || exit 1
 
