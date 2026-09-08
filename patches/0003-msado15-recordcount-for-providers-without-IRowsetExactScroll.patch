@@ -27,7 +27,7 @@
  
      hr = IRowsetExactScroll_GetExactPosition( recordset->rowset_es, 0, 0, 0, 0, &rows );
      if (SUCCEEDED(hr))
-@@ -4189,6 +4218,57 @@
+@@ -4189,6 +4218,60 @@
      }
  }
  
@@ -72,8 +72,11 @@
 +        if (obtained < ARRAY_SIZE(buf)) break;
 +    }
 +
-+    if (FAILED(hr) || FAILED(IRowset_RestartPosition( recordset->row_set, DB_NULL_HCHAPTER )))
++    if (SUCCEEDED(hr)) hr = IRowset_RestartPosition( recordset->row_set, DB_NULL_HCHAPTER );
++    if (FAILED(hr))
 +    {
++        /* Bail out rather than guess: a half-walked rowset with a made-up count
++         * would be worse than the -1 the caller already copes with. */
 +        WARN( "could not count rows, hr %#lx\n", hr );
 +        return;
 +    }
@@ -85,7 +88,7 @@
  static HRESULT WINAPI rsconstruction_put_Rowset(ADORecordsetConstruction *iface, IUnknown *unk)
  {
      struct recordset *recordset = impl_from_ADORecordsetConstruction( iface );
-@@ -4253,6 +4333,8 @@
+@@ -4253,6 +4336,8 @@
      if (SUCCEEDED(hr)) init_bookmark( recordset );
  
      IRowset_QueryInterface( rowset, &IID_IRowsetFind, (void**)&recordset->rowset_find );
@@ -94,7 +97,7 @@
      return S_OK;
  }
  
-@@ -4330,6 +4412,7 @@
+@@ -4330,6 +4415,7 @@
      recordset->cache.size = 1;
      recordset->cache.rows = malloc( sizeof(*recordset->cache.rows) );
      recordset->max_records = 0;

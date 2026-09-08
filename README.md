@@ -3,16 +3,18 @@
 Scripts and Wine patches for running **恒强新一代制版系统（16把纱嘴）** —
 Hengqiang's CNC flat-knitting pattern-design software — on Linux via Wine.
 
-**Status: the app installs and runs to its full UI, but cannot open or create
-documents yet.** See [`STATUS.md`](STATUS.md) for exactly what works, what
-doesn't, and the diagnosis so far. Read that before investing time.
+**Status: the app installs, runs, and opens and creates documents.** See
+[`STATUS.md`](STATUS.md) for exactly what works, what doesn't, and how each
+problem was diagnosed. Read that before investing time.
 
 | | |
 |---|---|
 | Installs, correct Chinese paths and fonts | yes |
 | Main UI, menus, drawing tools, colour panel | yes |
 | Reads its encrypted Access databases | yes |
-| `File > New` / `File > Open` | **no** — see [Open blockers](STATUS.md#open-blockers) |
+| `File > Open` | yes — all 26 shipped samples, verified unattended |
+| `File > New` | yes — model picker, canvas-size wizard, blank document |
+| Saving, compiling, exporting | untested |
 | Hardware dongle (SoftDog) | untested |
 
 ## What you need
@@ -20,6 +22,8 @@ doesn't, and the diagnosis so far. Read that before investing time.
 * A Linux box with Wine (developed against **11.17**, WoW64 build — Arch's
   `wine` package). Multilib/32-bit Wine is *not* required.
 * `winetricks`, `unixodbc`, `cabextract`, `curl`, `xdotool`, ImageMagick.
+* For the debugging scripts: `xorg-server-xvfb` and `gdb`. Not needed just to
+  run the app.
 * `clang` + `lld` if you want to build the Wine patches — these serve as the PE
   cross-compiler, so **mingw-w64 is not needed** (saves a ~1.2 GB install).
 * **Your own copy of the vendor installers.** Nothing vendor-supplied is
@@ -38,7 +42,8 @@ On Arch:
 
 ```sh
 sudo pacman -S --needed wine wine-mono wine-gecko winetricks unixodbc \
-                        cabextract curl xdotool imagemagick clang lld
+                        cabextract curl xdotool imagemagick clang lld \
+                        xorg-server-xvfb gdb
 ```
 
 You also need a Chinese locale generated, or the installer writes mojibake
@@ -93,15 +98,19 @@ Run it:
 
 ## The Wine patches
 
-`patches/` holds four fixes to Wine's `msado15` (ADO). Each was a bare
-`E_NOTIMPL` stub; none is specific to this app, and all are upstreamable to
-WineHQ:
+`patches/` holds five fixes to Wine's `msado15` (ADO). None is specific to this
+app, and all are upstreamable to WineHQ:
 
-* `_Command::Execute` — the app runs real SQL through it
-* `_Recordset::Collect` (get and put) — the recordset's default member, `rs("x")`
-* `_Command::put_ActiveConnection` — the VARIANT overload, needed by any
-  IDispatch/script caller
+* `_Command::Execute` — was `E_NOTIMPL`; the app runs all its SQL through it
+* `_Recordset::Collect` (get and put) — was `E_NOTIMPL`; the recordset's default
+  member, `rs("x")`
+* `_Command::put_ActiveConnection` — was `E_NOTIMPL`; the VARIANT overload,
+  needed by any IDispatch/script caller
 * a static cursor when the connection is `adUseClient`, so `MoveLast` works
+* **`Recordset::RecordCount` for providers without `IRowsetExactScroll`** — it
+  returned -1 for every ACE query, which is what broke both `File > Open` and
+  `File > New`. Wine now counts the rows once for an `adUseClient` recordset,
+  which is where Windows' client cursor engine already materialises them all.
 
 `20-build-msado15.sh` fetches Wine source matching your installed version,
 applies them, and builds just `msado15.dll` (~10 s, not the whole tree).
@@ -125,15 +134,31 @@ Scripts that turned out to be dead ends are kept and labelled rather than
 deleted, so nobody repeats them. `STATUS.md` has a "Dead ends" section listing
 what not to retry and why.
 
+## Debugging
+
+GUI work runs on a private Xvfb display rather than the real desktop, which
+makes the whole launch → interact → check cycle scriptable:
+
+```sh
+./scripts/30-xvfb.sh start
+WINEDEBUG=+seh ./scripts/23-repro-open.sh      # open a document, report crashes
+./scripts/24-survey-docs.sh                    # do that for every sample
+DISPLAY=:9 ./scripts/ui.sh find                # list windows
+DISPLAY=:9 ./scripts/ui.sh shot HqPDS out.png  # screenshot one
+```
+
+`ui.sh` refuses to synthesize input on `:0` — scripted clicking belongs on the
+scratch display, where nothing else can steal focus. `STATUS.md` has the rest,
+including why `import -window` cannot be used and why gdb breakpoints (but not
+gdb signal catching) fall apart inside a WoW64 process.
+
 ## Contributing
 
-The most useful thing right now is the document-open failure. `STATUS.md`
-documents the trail: MFC cannot find dialog template 3001, which lives in
-`HengJi.dll` rather than the exe, and the leading hypothesis is a failed
-`BaseMachine.dll` → `HengJi.dll` handshake. It also records the diagnostic
-techniques that worked, which is worth reading before starting — Wine's own
-crash dialog beats `winedbg` here, and the app's crash handler buries faults
-under millions of relay lines.
+The most useful thing now is everything past opening a document: saving,
+compiling a pattern, and exporting to the machine are all untested, and
+`Compile.dll` imports `StgCreateDocfile`, so saving may exercise Wine's
+structured storage in a way that opening does not. The SoftDog dongle is the
+other unknown — see `STATUS.md`.
 
 ## Licence and scope
 
