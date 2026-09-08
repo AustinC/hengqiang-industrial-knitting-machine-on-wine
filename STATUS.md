@@ -345,6 +345,7 @@ Run in order for a clean rebuild. Only step 05 needs mouse/keyboard.
 | `22-open-doc.sh` | Open a `.pds` from the command line (same path as the menu) |
 | `23-repro-open.sh` | **Full unattended open-a-document cycle on the private display** |
 | `24-survey-docs.sh` | Open every shipped sample and report which crash |
+| `25-recordcount-check.sh` | One-line before/after test for the `RecordCount` bug |
 | `30-xvfb.sh` | Start/stop the private X display |
 | `apppid.sh` | Find or kill the real app process among its three lookalikes |
 | `ui.sh` | Find/screenshot windows; click and type on the private display only |
