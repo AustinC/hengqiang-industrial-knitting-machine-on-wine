@@ -18,19 +18,21 @@ NATIVE="$SRC/downloads/mdac_x/native"
 OLEDB_DIR="$WINEPREFIX/drive_c/Program Files (x86)/Common Files/System/OLE DB"
 
 [ -f "$NATIVE/oledb32.dll" ] || { echo "!! extract MDAC first (missing $NATIVE/oledb32.dll)"; exit 1; }
+[ -f "$NATIVE/msdart.dll" ] || { echo "!! extract MDAC first (missing $NATIVE/msdart.dll)"; exit 1; }
 [ -d "$OLEDB_DIR" ] || { echo "!! missing $OLEDB_DIR"; exit 1; }
 
 echo "==> backing up wine's stub oledb32.dll"
 [ -f "$OLEDB_DIR/oledb32.dll.wine-builtin" ] || \
     cp -p "$OLEDB_DIR/oledb32.dll" "$OLEDB_DIR/oledb32.dll.wine-builtin"
 
-echo "==> installing native oledb32 / oledb32r / msdatl3"
+echo "==> installing native oledb32 / oledb32r / msdatl3 / msdart"
 cp -p "$NATIVE/oledb32.dll"  "$OLEDB_DIR/oledb32.dll"
 cp -p "$NATIVE/oledb32r.dll" "$OLEDB_DIR/oledb32r.dll"
 cp -p "$NATIVE/msdatl3.dll"  "$OLEDB_DIR/msdatl3.dll"
+cp -p "$NATIVE/msdart.dll"   "$OLEDB_DIR/msdart.dll"
 
 echo "==> setting native dll overrides"
-for d in oledb32 msdatl3; do
+for d in oledb32 msdatl3 msdart; do
     wine reg add 'HKCU\Software\Wine\DllOverrides' /v "$d" /t REG_SZ /d native /f >/dev/null 2>&1
 done
 wineserver -w

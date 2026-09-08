@@ -51,7 +51,7 @@ sudo locale-gen
 
 ## Install
 
-Scripts live in `scripts/`, numbered in run order. They use a **dedicated Wine
+Scripts live in `scripts/`, they are roughly numbered in run order but all aren't necessary for install. They use a **dedicated Wine
 prefix at `~/.wine-hqpds`** so they cannot disturb an existing `~/.wine`.
 Override with `WINEPREFIX=...` if you want somewhere else.
 
