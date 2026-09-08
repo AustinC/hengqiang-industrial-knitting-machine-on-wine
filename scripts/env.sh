@@ -21,8 +21,13 @@ export DISPLAY="${DISPLAY:-:0}"
 export LANG=zh_CN.UTF-8
 
 # Wine defaults to 96 DPI. On a HiDPI panel the app renders microscopically.
-# 96 = 100%, 120 = 125%, 144 = 150%, 192 = 200%. Pick to taste.
-DPI="${HQ_DPI:-120}"
+# 96 = 100%, 120 = 125%, 144 = 150%, 168 = 175%, 192 = 200%. Pick to taste.
+#
+# 144 suits a 4K 27-31" panel (~140 real DPI), which is what this was developed
+# on. The app scales cleanly -- menus, dialogs and toolbars all follow -- though
+# BCGControlBar's toolbar bitmaps are upscaled, so they soften above ~150%.
+# Use 26-set-dpi.sh to change it on an existing prefix.
+DPI="${HQ_DPI:-144}"
 
 # Vendor installers. Put them in the repo root, or point these at wherever you
 # keep them. Neither can be redistributed here, so you must supply your own.
