@@ -26,7 +26,7 @@ See [root cause 7](#7-recordcount-always--1--the-document-crashes) and the
 | Install | Completes to `C:\Program Files (x86)\恒强\横机制板系统（16把纱嘴）\`, 64 files, correct Chinese path |
 | Locale / codepage | `ACP=936` (GBK) — Chinese paths and UI strings decode correctly |
 | Fonts | Source Han Sans + WenQuanYi; `SimSun`/`SimHei`/`Microsoft YaHei`/`KaiTi` aliased. No tofu anywhere |
-| HiDPI | 144 DPI (panel is 3840x2160 @ 698mm ≈ 140 DPI; Wine defaults to 96) |
+| HiDPI | 120 DPI (`scripts/env.sh` default; Wine's own default of 96 is microscopic on a 4K panel). Override with `HQ_DPI` |
 | ACE OLE DB provider | `Microsoft.ACE.OLEDB.12.0` registered and loading |
 | VC++ runtime | 2015 x86 redist installed; `mfc140u.dll` present (needed by `BCGCBPRO2510u140.dll`) |
 | ODBC | `unixodbc` installed, `libodbc.so.2` error gone |
