@@ -7,6 +7,9 @@ Hengqiang's CNC flat-knitting pattern-design software — on Linux via Wine.
 [`STATUS.md`](STATUS.md) for exactly what works, what doesn't, and how each
 problem was diagnosed. Read that before investing time.
 
+<img width="3840" height="2160" alt="Screenshot_2026-09-07_18-54-17" src="https://github.com/user-attachments/assets/0209417d-8a9a-48cc-beef-d31d31f37abf" />
+
+
 | | |
 |---|---|
 | Installs, correct Chinese paths and fonts | yes |
