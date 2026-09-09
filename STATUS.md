@@ -316,7 +316,8 @@ alone; nothing about resources or `CDynLinkLibrary` needed touching.
 
 ### Scripts (`scripts/`)
 
-Run in order for a clean rebuild. Only step 05 needs mouse/keyboard.
+These are not intended to be run in order, some only serve as references of the debugging journey.
+Install instructions are in the main README.
 
 | Script | Purpose |
 |---|---|
