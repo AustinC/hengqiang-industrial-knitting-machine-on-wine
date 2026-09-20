@@ -62,12 +62,14 @@ sudo locale-gen
 Installation is done through a sequence of scripts.
 The scripts dir contains various scripts, but only some of them are involved in the install process.
 
-They use a **dedicated Wine
-prefix at `~/.wine-hqpds`** so they cannot disturb an existing `~/.wine`.
-Override with `WINEPREFIX=...` if you want somewhere else.
+By default the scripts use a **dedicated Wine prefix at `~/.wine-hqpds`**, so
+you do not need to set `WINEPREFIX` yourself and an existing `~/.wine` is left
+untouched. Override with `WINEPREFIX=...` if you want somewhere else.
 
-> `01-rebuild-prefix.sh` does `rm -rf "$WINEPREFIX"`. Check what `WINEPREFIX`
-> points at before running it.
+> `01-rebuild-prefix.sh` does `rm -rf "$WINEPREFIX"`. If you already have
+> `WINEPREFIX` exported in your shell for something unrelated, this script will
+> pick that up instead of defaulting to `~/.wine-hqpds` and delete it. Check
+> `echo $WINEPREFIX` before running it.
 
 ```sh
 ./scripts/01-rebuild-prefix.sh          # fresh prefix, zh_CN locale, HiDPI
