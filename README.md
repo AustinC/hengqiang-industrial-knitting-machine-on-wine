@@ -159,13 +159,6 @@ scratch display, where nothing else can steal focus. `STATUS.md` has the rest,
 including why `import -window` cannot be used and why gdb breakpoints (but not
 gdb signal catching) fall apart inside a WoW64 process.
 
-## Contributing
-
-The most useful thing now is everything past opening a document: saving,
-compiling a pattern, and exporting to the machine are all untested, and
-`Compile.dll` imports `StgCreateDocfile`, so saving may exercise Wine's
-structured storage in a way that opening does not. The SoftDog dongle is the
-other unknown — see `STATUS.md`.
 
 ## Licence and scope
 
