@@ -138,134 +138,33 @@ Unhandled page fault on write access to 0861000C at address 1001D189
 
 3. **Disassemble rather than trust the debugger.** Wine's crash dialog gives a
    register dump and module map (click 详细信息 on 程序错误) but its backtrace is
-   always empty — winedbg cannot unwind 32-bit stacks under WoW64. The `+loaddll`
-   trace puts `BaseMachine.dll` at `0x10000000`, so the fault is at RVA
-   `0x1D189`, and `objdump -d --start-address=` shows the loop around it:
+   always empty — winedbg cannot unwind 32-bit stacks under WoW64. The faulting
+   address maps to `BaseMachine.dll + 0x1D189`; `objdump -d --start-address=`
+   showed a loop `for (j = 0; j < p->count; j++) p->items[j] = ...` over an array
+   the constructor sizes at a fixed 160 elements.
 
-   ```
-   1001d177:  cmp    0x24(%ecx),%edx        ; j < p->field_24   (jae -> unsigned)
-   1001d17c:  imul   $0x38,-0x48(%ebp),%eax ; eax = j * 0x38
-   1001d189:  mov    %edx,0x2c(%ecx,%eax,1) ; p[0x2c + j*0x38] = ...  <-- faults
-   ```
+4. **Name the function from the export table.** `objdump -p` plus the ordinal
+   and name tables map the RVA to an exported symbol:
+   `CBaseMachineType::Serialize(CArchive&, unsigned, CString, CDocument*)`.
+   Nearby `.rdata` strings gave the source file (`BaseMachineType.cpp`).
 
-   Four facts come straight off that, before knowing anything about the app:
-   the object pointer lives in the local at `-0x38(%ebp)`, its element count is
-   at `+0x24`, an array of `0x38`-byte elements starts at `+0x2c`, and the
-   comparison is **unsigned** — so a count of -1 means four billion iterations
-   rather than none. This is also the step that says *which* offset to go and
-   read; the fault address alone does not.
-
-4. **Work out the object's shape, and notice it cannot legally hold -1.**
-   Walking back through the same function finds where the pointer comes from:
-   `operator new(0x46fc)` followed by a constructor, and that constructor calls
-   MSVC's array-construct helper as
-   `__ehvec_ctor_iter(this+0x28, 0x38, 0xa0, ctor, dtor)` — an **inline array of
-   160 elements**, fixed at compile time — then `movl $0x0,0x24(%ecx)`.
-
-   Two things follow. First, the member offsets sum to exactly `0x46fc`, the
-   allocation size, which is the confirmation that the layout is really being
-   read rather than pattern-matched out of noise. Second, `0xFFFFFFFF` is
-   *structurally impossible* for this object: the constructor writes 0 and the
-   array can never exceed 160. So the value was written deliberately by
-   somebody, which turns a vague "find the memory corruption" into a far
-   narrower "find the writer".
-
-5. **Name the types from the export table.** `objdump -p` gives the export
-   address and name tables; mapping RVAs to symbols turns the faulting function
-   into `CBaseMachineType::Serialize(CArchive&, unsigned, CString, CDocument*)`,
-   and nearby `.rdata` strings give the source file (`BaseMachineType.cpp`).
-
-   The faulting function reaches its object by searching an MFC `CList` at
-   `this+0x60`, comparing a `CString` at offset 0 of each element. What that
-   list holds comes out of a sibling export, because MSVC name mangling encodes
-   template arguments:
-
-   ```
-   ?GetCanvasList@CBaseMachineType@@UAEPAV?$CList@PAUCanvasInfoTag@@PAU1@@@XZ
-                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-                                           CList<CanvasInfoTag *, CanvasInfoTag *>
-   ```
-
-   So the objects are canvases — read off the binary's own type name, not
-   guessed. At this point it is still an inference that `this+0x60` is that
-   list; steps 6 and 7 each confirm it independently.
-
-6. **Read the real values with gdb.** Breakpoints destabilise gdb in a WoW64
+5. **Read the actual value with gdb.** Breakpoints destabilise gdb in a WoW64
    process, but catching the fault does not. Attach, `handle SIGUSR1 nostop
    noprint pass` (wine uses it to suspend threads, and stopping on it derails
-   everything), `continue`, and inspect at the SIGSEGV.
+   everything), `continue`, and read `$ecx` at the SIGSEGV. The counter was
+   `0xFFFFFFFF`, and walking the object list showed exactly one canvas of nine —
+   `VIEW_TYPE_FUNC_LINE` — holding it; the other eight held 0.
 
-   Note what is where: `$ecx` is the *object pointer*, not the bad number — the
-   `0xFFFFFFFF` is at `[$ecx+0x24]`, which step 3 is what identified. `$ebp` is
-   still valid, so `*(ebp-0x34)` gives `Serialize`'s `this`, and from there the
-   `CList` at `this+0x60` can be walked by hand: head pointer at `+4`, count at
-   `+0xc`, each node's data at `node+8`. Each canvas's name is the `CString` at
-   offset 0, read as UTF-16 until the NUL. That prints:
+6. **Follow it back to the source of the number.** The func-line canvas is the
+   only one whose setup runs a query, found by disassembling HengJi.dll's
+   `InitCanvasList` and reading the format string it passes: a `UNION` over
+   `FuncLineAndType`. In the ADO trace the app opens that recordset, calls
+   `MoveLast`, calls `get_RecordCount`, and closes it immediately — the classic
+   row-count idiom. Wine handed it -1.
 
-   ```
-   [0] 0x085d95a0 name='VIEW_TYPE_KNIT'       count@24=0x00000000
-   [1] 0x085ddca8 name='VIEW_TYPE_INTARSIA'   count@24=0x00000000
-   [2] 0x085e2f80 name='VIEW_TYPE_FUNC_LINE'  count@24=0xffffffff   <-- the faulting one
-   [3] 0x08554508 name='VIEW_TYPE_JACQUARD'   count@24=0x00000000
-   ...                                        (nine in total)
-   ```
-
-   Nine near-identical objects, one wrong value. That is the whole lever for
-   what follows: instead of auditing the code that fills canvases, compare the
-   nine construction sites and read only the one that is not like the others.
-
-7. **Find who writes the field, by elimination.** Grepping a full disassembly of
-   `BaseMachine.dll` for stores to `+0x24` turns up only two things: the
-   constructor's zero, and a save/restore pair that copies `+0x24` to and from a
-   backup member at `+0x23f8`. BaseMachine therefore never sets a non-zero count
-   at all, so another module must.
-
-   `HengJi.dll` is the machine-specific extension DLL. Grepping *its*
-   disassembly for `push $0x46fc` — the same allocation size — finds exactly
-   **nine**, consecutive, inside one function: its override of the exported
-   virtual `CBaseMachineType::InitCanvasList`. Each block sets the canvas name
-   and fields, sets `+0x24 = 0`, and calls `AddTail` on `this+0x60`, which also
-   settles the open question from step 5 about what that list is.
-
-   The third block — matching `VIEW_TYPE_FUNC_LINE`'s position in the list — is
-   the only one of the nine with an extra call before `AddTail`.
-
-8. **Read the string the odd block passes.** That extra call pushes a `.rdata`
-   pointer into a `CString::Format`-shaped call. Mapping the VA to a file offset
-   through the PE section headers and decoding it as UTF-16 gives it directly:
-
-   ```sql
-   SELECT * FROM ( SELECT * FROM FuncLineAndType WHERE MachineId = %d AND MenuTypeId = %d
-                   UNION
-                   SELECT * FROM FuncLineAndType WHERE MachineId = %d AND MenuTypeId = 0
-                   AND MenuTypeGroup NOT IN (SELECT MenuTypeGroup FROM FuncLineAndType
-                                             WHERE MachineId = %d AND MenuTypeId = %d) )
-   AS AA ORDER BY TypeId, ID
-   ```
-
-   So the func-line canvas is the only one of the nine whose size comes from the
-   database — which is exactly why it is the only one holding a bad number.
-
-9. **Cross-check against the ADO trace.** That query appears verbatim in a
-   `WINEDEBUG=+msado15` log, and what the app does with the result is the tell:
-   `recordset_get_BOF`, `recordset_MoveLast`, `recordset_get_RecordCount`,
-   `recordset_Close` — and no field access whatsoever. A recordset opened purely
-   to ask how many rows there are, which is the standard idiom for making
-   `RecordCount` valid on a server-side cursor. The number being stored as the
-   element count *is* `RecordCount`, and Wine was handing back -1.
-
-10. **Confirm in isolation.** A five-line VBScript over the same ACE connection
-    reproduces `RecordCount = -1` for every query with no app involved — see
-    `scripts/25-recordcount-check.sh`. Wine's `recordset_get_RecordCount` then
-    explains itself in a dozen lines of source.
-
-The transferable part is steps 4, 6 and 7. Establishing that the bad value was
-*impossible by construction* ruled out stray corruption and reframed the hunt as
-"who wrote this", which is answerable by grepping for stores to one offset.
-Having nine sibling objects with one anomaly among them meant the answer could
-be found by **comparing the construction sites and reading only the one that
-differs**, rather than by understanding how canvases are built. Neither step
-needed the app running.
+7. **Confirm in isolation.** A five-line VBScript through the same ACE
+   connection reproduced `RecordCount = -1` for every query, with no app
+   involved.
 
 ## Root causes found and fixed
 
