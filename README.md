@@ -4,8 +4,7 @@ Scripts and Wine patches for running **恒强新一代制版系统（16把纱嘴
 Hengqiang's CNC flat-knitting pattern-design software — on Linux via Wine.
 
 **Status: the app installs, runs, and opens and creates documents.** See
-[`STATUS.md`](STATUS.md) for exactly what works, what doesn't, and how each
-problem was diagnosed. Read that before investing time.
+[`STATUS.md`](STATUS.md) for notes on the patches supplied.
 
 <img width="3840" height="2160" alt="Screenshot_2026-09-07_18-54-17" src="https://github.com/user-attachments/assets/0209417d-8a9a-48cc-beef-d31d31f37abf" />
 
