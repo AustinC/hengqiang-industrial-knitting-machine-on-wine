@@ -1,23 +1,13 @@
 # 恒强 HQ-PDS16 (Hengqiang 980) under Wine
 
-Scripts and Wine patches for running **恒强新一代制版系统（16把纱嘴）** —
-Hengqiang's CNC flat-knitting pattern-design software — on Linux via Wine.
+Scripts and Wine patches for running Hengqiang's CNC flat-knitting pattern-design software **恒强新-代制版系统（16把纱嘴）** on Linux via Wine.
 
-**Status: the app installs, runs, and opens and creates documents.** See
+See
 [`STATUS.md`](STATUS.md) for notes on the patches supplied.
 
 <img width="3840" height="2160" alt="Screenshot_2026-09-07_18-54-17" src="https://github.com/user-attachments/assets/0209417d-8a9a-48cc-beef-d31d31f37abf" />
 
 
-| | |
-|---|---|
-| Installs, correct Chinese paths and fonts | yes |
-| Main UI, menus, drawing tools, colour panel | yes |
-| Reads its encrypted Access databases | yes |
-| `File > Open` | yes — all 26 shipped samples, verified unattended |
-| `File > New` | yes — model picker, canvas-size wizard, blank document |
-| Saving, compiling, exporting | untested |
-| Hardware dongle (SoftDog) | untested |
 
 ## What you need
 
